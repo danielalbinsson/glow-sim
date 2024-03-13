@@ -1,0 +1,202 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="GLow Sim">
+	<main>
+		<!--h1><span class="text-gradient">Glow Sim</span></h1-->
+		<div class="instructions">
+			<div>
+			<label for="players">Players</label>
+			<input type="number" id="num-players" placeholder="Number of players" value="10"/>
+			</div>
+			<div>
+			<label for="pot">Starting Pot</label>
+			<input type="number" id="num-startPot" placeholder="Starting pot" value="1000" />
+			</div>
+			<div>
+			<label for="epochs">Epochs</label>
+			<input type="number" id="num-epochs" placeholder="Number of epochs" value="10"/>
+			</div>
+			<div>
+			<label for="fee">Fee</label>	
+			<input type="number" id="fee" placeholder="Fee %" value="1"/>
+			</div>
+			<button id="start-simulation">Start simulation</button>
+		</div>
+		<div>
+			<canvas id="potChart"></canvas>
+		</div>
+		<div>
+			<canvas id="playersChart"></canvas>
+		</div>
+        	<div id="results-container"></div>
+    </main>
+
+	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	<script type="module">
+		import { runSimulation, accumulatePlayerData, generatePlayerDatasets } from '../sim.js'; // Adjust the path as necessary
+	
+		document.addEventListener('DOMContentLoaded', () => {
+			const startSimulationButton = document.getElementById('start-simulation');
+			startSimulationButton.addEventListener('click', async () => {
+				// Fetch input values
+				const numPlayers = parseInt(document.getElementById('num-players').value, 10);
+				const startPot = parseInt(document.getElementById('num-startPot').value, 10);
+				const numEpochs = parseInt(document.getElementById('num-epochs').value, 10);
+				const feePercentage = parseFloat(document.getElementById('fee').value);
+	
+				if (isNaN(numPlayers) || isNaN(startPot) || isNaN(numEpochs) || isNaN(feePercentage)) {
+					alert("Please fill all the fields with valid numbers.");
+					return;
+				}
+	
+				const results = runSimulation(numEpochs, startPot, feePercentage, numPlayers);
+				const playerData = accumulatePlayerData(results.simulationData);
+				const playerDatasets = generatePlayerDatasets(playerData);
+	
+				// Generate pot development chart
+				generatePotChart(results.simulationData);
+	
+				// Generate players cost and winnings chart
+				generatePlayersChart(playerDatasets, numEpochs);
+
+				const resultsContainer = document.getElementById('results-container');
+				resultsContainer.innerHTML = ''; 
+
+				results.simulationData.forEach(epoch => {
+					const epochSummary = document.createElement('div');
+					let epochHtml = `<h4>Epoch ${epoch.epoch} - ${epoch.players.length} players</h4>
+									<p>Epoch pot: ${epoch.potSizeBefore}</p>`;
+
+					// Loop through each player to list their slots and costs
+					epoch.players.forEach(player => {
+						epochHtml += `<p>Player ${player.id} slots: ${player.slots.join(", ")} (total cost: ${player.costs})</p>`;
+					});
+
+					// Add lowest unique number, winner, and fees information
+					epochHtml += `<p>Lowest unique number: ${epoch.stats.lowestUniqueNumber ?? 'None'}</p>
+								<p>Epoch winner: ${epoch.stats.winner ? `Player ${epoch.stats.winner} wins ${epoch.winnersEarnings}` : 'No winner'}</p>
+								<p>Epoch fees: ${epoch.fees}</p>
+								<p>Updated pot: ${epoch.potSizeAfter}</p>
+								<hr>`;
+
+					// Set the innerHTML of the epochSummary and append it to the results container
+					epochSummary.innerHTML = epochHtml;
+					resultsContainer.appendChild(epochSummary);
+
+			});
+		});
+	
+		function generatePotChart(simulationData) {
+			const potSizes = simulationData.map(epoch => epoch.potSizeAfter);
+			const ctxPot = document.getElementById('potChart').getContext('2d');
+
+			//if (potChart) potChart.destroy();
+
+			let potChart = new Chart(ctxPot, {
+				type: 'line',
+				data: {
+					labels: Array.from({ length: simulationData.length }, (_, i) => `Epoch ${i + 1}`),
+					datasets: [{
+						label: 'Pot Size',
+						data: potSizes,
+						borderColor: 'rgba(75, 192, 192, 1)',
+						backgroundColor: 'rgba(75, 192, 192, 0.2)',
+					}]
+				},
+				options: {
+					scales: {
+						y: {
+							beginAtZero: true
+						}
+					}
+				}
+			});
+		}
+	
+		function generatePlayersChart(playerDatasets, numEpochs) {
+			const labels = Array.from({ length: numEpochs }, (_, i) => `Epoch ${i + 1}`);
+			const ctxPlayers = document.getElementById('playersChart').getContext('2d');
+
+			//if (playersChart) playersChart.destroy()
+
+
+			let playersChart = new Chart(ctxPlayers, {
+				type: 'line',
+				data: {
+					labels: labels,
+					datasets: playerDatasets
+				},
+				options: {
+					scales: {
+						y: {
+							beginAtZero: true
+						}
+					}
+				}
+			});
+		}
+	</script>
+	
+	
+
+</Layout>
+<style>
+	main {
+		margin: auto;
+		padding: 1rem;
+		width: 800px;
+		max-width: calc(100% - 2rem);
+		color: white;
+		font-size: 20px;
+		line-height: 1.6;
+	}
+	.astro-a {
+		position: absolute;
+		top: -32px;
+		left: 50%;
+		transform: translatex(-50%);
+		width: 220px;
+		height: auto;
+		z-index: -1;
+	}
+	h1 {
+		font-size: 4rem;
+		font-weight: 700;
+		line-height: 1;
+		text-align: center;
+		margin-bottom: 1em;
+	}
+	.text-gradient {
+		background-image: var(--accent-gradient);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		background-size: 400%;
+		background-position: 0%;
+	}
+	.instructions {
+		margin-bottom: 2rem;
+		border: 1px solid rgba(var(--accent-light), 25%);
+		background: linear-gradient(rgba(var(--accent-dark), 66%), rgba(var(--accent-dark), 33%));
+		padding: 1.5rem;
+		border-radius: 8px;
+	}
+	.instructions code {
+		font-size: 0.8em;
+		font-weight: bold;
+		background: rgba(var(--accent-light), 12%);
+		color: rgb(var(--accent-light));
+		border-radius: 4px;
+		padding: 0.3em 0.4em;
+	}
+	.instructions strong {
+		color: rgb(var(--accent-light));
+	}
+	.link-card-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(24ch, 1fr));
+		gap: 2rem;
+		padding: 0;
+	}
+</style>
