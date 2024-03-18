@@ -20,12 +20,17 @@
 // the fist epoch has a fixed pot price set initaly in the simulation (numPot starting value)
 // after each epoch the pot price is increased by the earnings of the previous epoch (numPot + earnings of the previous epoch - fees)
 
-export function runSimulation(numEpochs, initialPot, feePercentage, numPlayers) {
-    let simulation = initSimulation(numEpochs, initialPot, feePercentage);
+export function runSimulation(numEpochs, initialPot, winnerPercentage, feePercentage, numPlayers) {
+    let simulation = initSimulation(numEpochs, initialPot, winnerPercentage, feePercentage, numPlayers);
     let numPot = simulation.initialPot;
-    let potChart;
-    let playersChart; 
+    let winnersPercentage = simulation.winnerPercentage;
 
+    // Debugging
+    console.log("Epochs: " + simulation.numEpochs);
+    console.log("Starting Pot: " + simulation.initialPot);
+    console.log("Winner gets: " + simulation.winnerPercentage + "%");
+    console.log("Protocol fee: " +simulation.feePercentage + "%");
+    console.log("Players: " + simulation.numPlayers);
 
     let resultsSummary = {
         simulationData: [],
@@ -35,12 +40,12 @@ export function runSimulation(numEpochs, initialPot, feePercentage, numPlayers) 
 
     for (let epoch = 0; epoch < simulation.numEpochs; epoch++) {
         //let numPlayers = Math.floor(Math.random() * 10) + 1;
-        let players = simBuySlotsForAllPlayers(numPlayers);
+        let players = simBuySlotsForAllPlayers(numPlayers, numPot);
         let stats = calculateWinnerAndStats(players);
 
         let totalCosts = players.reduce((acc, player) => acc + player.costs, 0);
         let fees = totalCosts * simulation.feePercentage / 100;
-        let winnersEarnings = numPot * 0.5; // Assuming winner takes half the pot
+        let winnersEarnings = numPot * winnersPercentage / 100; // Calculate the winner's earnings
 
         // Calculate the pot size after this epoch's transactions
         let potSizeAfter = numPot - winnersEarnings + (totalCosts - fees);
@@ -71,15 +76,29 @@ export function runSimulation(numEpochs, initialPot, feePercentage, numPlayers) 
     return resultsSummary;
 }
 
-function simBuySlotsForAllPlayers(numPlayers) {
-    let players = [];
-    for (let i = 0; i < numPlayers; i++) {
-        let numberSlots = Math.floor(Math.random() * 100) + 1;
-        let slotsSet = new Set(); // Use a Set to ensure uniqueness
+function weightedRandomSelect(maxNumber) {
+    let bias = 10; // Increase for more bias towards lower numbers
+    let randomNumber = Math.pow(Math.random(), bias) * maxNumber;
+    return Math.floor(randomNumber) + 1; // +1 to adjust for zero indexing
+}
 
-        // Keep adding unique slots until the Set reaches the desired number of slots
-        while (slotsSet.size < numberSlots) {
-            slotsSet.add(Math.floor(Math.random() * 100) + 1);
+// simulation of players buying slots - totaly random for now
+// todo: add a strategies for players to buy slots
+function simBuySlotsForAllPlayers(numPlayers, currentPotSize) {
+    let players = [];
+    let budget = 0.1;
+    for (let i = 0; i < numPlayers; i++) {
+        let playerBudget = budget * currentPotSize;
+        let slotsSet = new Set(); // Use a Set to ensure uniqueness
+        let totalCost = 0;
+
+        while (true) {
+            let slotCost = weightedRandomSelect(currentPotSize/15, 10);
+            if (totalCost + slotCost > playerBudget) {
+                break;
+            }
+            slotsSet.add(slotCost);
+            totalCost += slotCost;
         }
 
         // Convert the Set back to an array and sort it in ascending order
@@ -88,11 +107,12 @@ function simBuySlotsForAllPlayers(numPlayers) {
         players.push({
             id: i + 1, // Assign an ID for easier reference
             slots,
-            costs: slots.reduce((acc, val) => acc + val, 0),
+            costs: totalCost,
         });
     }
     return players;
-}
+};
+
 
 export function accumulatePlayerData(simulationData) {
     let playerData = {};
@@ -151,11 +171,14 @@ function calculateWinnerAndStats(players) {
     };
 }
 
-function initSimulation(numEpochs, initialPot, feePercentage) {
+function initSimulation(numEpochs, initialPot, winnerPercentage, feePercentage, numPlayers) {
     return {
         numEpochs,
         initialPot,
+        winnerPercentage,
         feePercentage,
+        numPlayers,
         epochData: [],
     };
 }
+

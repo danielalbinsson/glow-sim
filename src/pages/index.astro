@@ -8,15 +8,19 @@ import Layout from '../layouts/Layout.astro';
 		<div class="instructions">
 			<div>
 			<label for="players">Players</label>
-			<input type="number" id="num-players" placeholder="Number of players" value="10"/>
+			<input type="number" id="num-players" placeholder="Number of players" value="1" />
 			</div>
 			<div>
-			<label for="pot">Starting Pot</label>
-			<input type="number" id="num-startPot" placeholder="Starting pot" value="1000" />
+			<label for="pot">Initial Pot</label>
+			<input type="number" id="num-initialPot" placeholder="Initial pot" value="1000" />
+			</div>
+			<div>
+			<label for="pot">Winners Percentage</label>
+			<input type="number" id="num-winnerPrecentage" placeholder="Winners Percentage" value="50" />
 			</div>
 			<div>
 			<label for="epochs">Epochs</label>
-			<input type="number" id="num-epochs" placeholder="Number of epochs" value="10"/>
+			<input type="number" id="num-epochs" placeholder="Number of epochs" value="5"/>
 			</div>
 			<div>
 			<label for="fee">Fee</label>	
@@ -30,7 +34,7 @@ import Layout from '../layouts/Layout.astro';
 		<div>
 			<canvas id="playersChart"></canvas>
 		</div>
-        	<div id="results-container"></div>
+        <div id="results-container"></div>
     </main>
 
 	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -42,16 +46,16 @@ import Layout from '../layouts/Layout.astro';
 			startSimulationButton.addEventListener('click', async () => {
 				// Fetch input values
 				const numPlayers = parseInt(document.getElementById('num-players').value, 10);
-				const startPot = parseInt(document.getElementById('num-startPot').value, 10);
+				const initialPot = parseInt(document.getElementById('num-initialPot').value, 10);
+				const winnerPercentage = parseFloat(document.getElementById('num-winnerPrecentage').value, 10);
 				const numEpochs = parseInt(document.getElementById('num-epochs').value, 10);
-				const feePercentage = parseFloat(document.getElementById('fee').value);
+				const feePercentage = parseFloat(document.getElementById('fee').value, 1);
 	
-				if (isNaN(numPlayers) || isNaN(startPot) || isNaN(numEpochs) || isNaN(feePercentage)) {
+				if (isNaN(numPlayers) || isNaN(initialPot) || isNaN(numEpochs) || isNaN(feePercentage)) {
 					alert("Please fill all the fields with valid numbers.");
 					return;
 				}
-	
-				const results = runSimulation(numEpochs, startPot, feePercentage, numPlayers);
+				const results = runSimulation(numEpochs, initialPot, winnerPercentage, feePercentage, numPlayers);
 				const playerData = accumulatePlayerData(results.simulationData);
 				const playerDatasets = generatePlayerDatasets(playerData);
 	
@@ -88,15 +92,20 @@ import Layout from '../layouts/Layout.astro';
 			});
 		});
 	});
-	
+
+		let potChart;
 	
 		function generatePotChart(simulationData) {
 			const potSizes = simulationData.map(epoch => epoch.potSizeAfter);
 			const ctxPot = document.getElementById('potChart').getContext('2d');
 
-			//if (potChart) potChart.destroy();
+			ctxPot.clearRect(0, 0, ctxPot.width, ctxPot.height);
+			
+			if (potChart) {
+				potChart.destroy();
+			}
 
-			let potChart = new Chart(ctxPot, {
+			potChart = new Chart(ctxPot, {
 				type: 'line',
 				data: {
 					labels: Array.from({ length: simulationData.length }, (_, i) => `Epoch ${i + 1}`),
@@ -117,14 +126,17 @@ import Layout from '../layouts/Layout.astro';
 			});
 		}
 	
+		let playersChart;
 		function generatePlayersChart(playerDatasets, numEpochs) {
 			const labels = Array.from({ length: numEpochs }, (_, i) => `Epoch ${i + 1}`);
 			const ctxPlayers = document.getElementById('playersChart').getContext('2d');
 
-			//if (playersChart) playersChart.destroy()
+			if (playersChart) {
+				playersChart.destroy()
+			}
 
 
-			let playersChart = new Chart(ctxPlayers, {
+			playersChart = new Chart(ctxPlayers, {
 				type: 'line',
 				data: {
 					labels: labels,
